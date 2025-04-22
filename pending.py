@@ -34,7 +34,7 @@ def connectSocket(cybot_ip, cybot_port, q):
 
 
 #returns dictionary of all elements on pending screen resized
-def resizePendingScreen(width, elements):
+def resizePendingScreen(width, elements, IPText = "10.49.177.37", portText = "288"):
 
     pygame.font.init()
 
@@ -53,35 +53,33 @@ def resizePendingScreen(width, elements):
     cancelButtonH = connectButtonH
     cancelButtonX = width - (connectButtonX + cancelButtonW)
 
+    textFieldScale = 3/4
 
     portFieldY = height/2
     portFieldX = connectButtonX
     portFieldH = width/16
     portFieldW = connectButtonW
 
-    portTextHeight = portFieldH
+    portTextHeight = portFieldH * textFieldScale
 
     portTextFontSize = int((portTextHeight/3) * 4)
 
     portTextX = portFieldX + width/100
-    portTextY = portFieldY - width/75
+    portTextY = (portFieldY + (portFieldH/2) - (portTextHeight/2))-width/75
 
     
     IPFieldY = (height/2) - portFieldH * 2
     IPFieldX = connectButtonX
     IPFieldH = width/16
     IPFieldW = connectButtonW
-    IPText = "10.49.177.37"
+
 
     IPTextHeight = IPFieldH * (3/4)
     IPTextFontSize = int((IPTextHeight/3) * 4)
     IPTextY = (IPFieldY + (IPFieldH/2) - (IPTextHeight/2))-width/75
     IPTextX = IPFieldX + width/100
 
- 
 
-    
-    portText = "288"
 
 
     elements["Radius"] = int(width/100)
@@ -149,6 +147,10 @@ def pendingConnection():
 
     elements = {}
     resizePendingScreen(width, elements)
+
+    img = pygame.image.load('ISULogo.png')
+    pygame.display.set_icon(img)
+    pygame.display.set_caption("Cybot")
 
 
     running = True
