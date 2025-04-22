@@ -1,0 +1,7 @@
+cardinal = (200, 16, 46)
+gold = (241, 190, 72)
+accentColor1 = (202, 199, 167)
+white = (255, 255, 255)
+accentColor2 = (155 ,148, 95)
+warmGray = (172, 163, 154)
+accentColor3 = (185, 151, 91)

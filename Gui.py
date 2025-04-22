@@ -4,6 +4,11 @@ import pygame
 from pygame.locals import *
 import select
 import math
+import threading
+import queue
+import pending
+from ISUColors import *
+
 
 def check_socket_data(sock):
     sock.setblocking(0)
@@ -111,7 +116,7 @@ def normalizeObjects(objs, windowWidth = 1600, windowHeight = 900, windowXOffset
 
     return normalized
 
-def drawObjects(objs, screen, color = (100,100,100)):
+def drawObjects(objs, screen, color = gold):
 
     if objs == -1:
         return
@@ -120,100 +125,7 @@ def drawObjects(objs, screen, color = (100,100,100)):
         pygame.draw.circle(screen, color, (x[1], x[2]), x[0])
 
 
-#loop while pending connection, consists of main screen with ip
-#and port fields, and a button to connect which may time out
-#if the connection fails and times out then you just stay in that
-#screen and keep repeating until valid connection is made
-#if at any point during main functions the connection stops we will
-#return to this screen with a notification the connection stopped
-def pendingConnection():
-    cybot_ip = "10.49.177.37"
-    cybot_port = 288
 
-    width = 800
-    height = 350
-
-    startScreen = pygame.display.set_mode((width, height))
-    startScreen.fill((39, 13, 74))
-
-    buttonX = width/2
-    buttonY = (height/2) + 100
-    buttonW = 100
-    buttonH = 50
-    buttonR = 6
-
-    buttonInitialColor = (0,150, 90)
-    buttonPendingColor = (230,10,10)
-
-    button = Rect((buttonX - (buttonW/2), buttonY - (buttonH/2)), (buttonW, buttonH))
-
-    pygame.draw.rect(startScreen, buttonInitialColor, button, 0, buttonR)
-
-    running = True
-
-    #set true when click start, set false when click cancel
-    attemptingConnection = False
-    attemptCount = 0
-    maxAttempts = 1
-
-    socketConnected = False
-
-    mouse = pygame.mouse.get_pos()
-
-    client = -1
-
-    while(running and (not(socketConnected))):
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-
-                #if we clicked button and aren't already attempting, begin connection attempts
-                if (button.collidepoint(mouse[0], mouse[1]) and (not(attemptingConnection))):
-
-                    attemptingConnection = True
-
-                    #change button color
-                    pygame.draw.rect(startScreen, buttonPendingColor, button, 0, buttonR)
-
-        
-        mouse = pygame.mouse.get_pos()
-
-        pygame.display.update()
-
-
-        if(attemptingConnection):
-
-            #try to establish connection
-            try:
-                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                client.connect((cybot_ip, cybot_port))
-                
-                #we connected successfully
-                attemptingConnection = False
-                socketConnected = True
-                pygame.draw.rect(startScreen, (0,255,0), button,  0, buttonR)
-
-            except (ConnectionRefusedError, TimeoutError):
-
-                #keep going if haven't reached max attempts
-                if(attemptCount < maxAttempts):
-                    attemptCount += 1
-                else:
-                    #exhausted attempts and will stop attempting
-                    attemptingConnection = False
-                    attemptCount = 0
-                    pygame.draw.rect(startScreen, buttonInitialColor, button,  0, buttonR)
-                    
-
-                pass
-    
-
-    
-
-    return client
 
 #returns state if changed, -1 otherwise
 def keyDownEventHandler(event, movementStack, currState):
@@ -308,12 +220,13 @@ def main():
 
     pygame.init()
 
-    running = True
-
-    client = pendingConnection()
+    client = pending.pendingConnection()
+    
+    #true if client valid
+    running = client != -1
 
     screen = pygame.display.set_mode((1600, 900))
-    screen.fill((38, 35, 46))
+
 
     pygame.display.set_caption("Hello Pygame")
     pygame.display.update()
@@ -321,7 +234,7 @@ def main():
 
     message = ""
     currField = -1
-    objColor = (100,100,100)
+    objColor = gold
     movementStack = []
 
     windowWidth = 1000
@@ -334,7 +247,7 @@ def main():
     windowBuffer = 30
 
     #cybot for visual data, [size, x, y, angle]
-    cybotSprite = []
+    cybotSprite = [0,0,0,0]
 
     #started Idle
     #I = Idle
@@ -349,9 +262,9 @@ def main():
 
     while (running and (message != "end")):
         message = ""
-        screen.fill((38, 35, 46))
+        screen.fill(accentColor3)
 
-        pygame.draw.rect(screen, (28, 25, 36), Rect((windowXOffset - windowBuffer/2, windowYOffset - windowBuffer/2), (windowWidth + windowBuffer, windowHeight + windowBuffer)), 0, 3)
+        pygame.draw.rect(screen, accentColor1, Rect((windowXOffset - windowBuffer/2, windowYOffset - windowBuffer/2), (windowWidth + windowBuffer, windowHeight + windowBuffer)), 0, 3)
         drawObjects(currField, screen, objColor)
         drawCybot(screen ,cybotSprite)
 
@@ -401,36 +314,12 @@ def main():
                     cybotSprite = objects[0]
                     currField = objects[1:]
 
-                elif (message[0:6] == "Color:"):
-                    splitMessage = message[7:].split(", ")
-                    
-
-                    try:
-                        color = [int(x) for x in splitMessage]
-
-                        for x in color:
-                            if ((x > 255) or (x < 0)):
-                                raise ValueError
-                        
-                        objColor = (color[0], color[1], color[2])
-                        print(objColor)
-                    except (IndexError):
-                        print()
-                        print(IndexError)
-                        print("Not enough values for Color\n")
-
-                    except ValueError:
-                        print()
-                        print(ValueError)
-                        print("Value out of bounds for color\n")
-
-
 
                 else:
                     print("Message: " + message)
                 
         except (ConnectionResetError):
-            client = pendingConnection()
+            client = pending.pendingConnection()
             if(client == -1):
                 running = False
             
