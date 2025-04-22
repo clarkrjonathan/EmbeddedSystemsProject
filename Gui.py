@@ -40,29 +40,17 @@ def parseObjects(message):
     return objs
 
 #normalizes objects to be within a certain span at a specified offset
-def normalizeObjects(objs, windowWidth = 1600, windowHeight = 900, windowXOffset = 0, windowYOffset = 0):
+def normalizeObjects(objs, windowSurface):
+    windowWidth = windowSurface.get_width()
+    windowHeight = windowSurface.get_height()
 
     #measure y span
     #measure x span
-
-    #find x scale to bring largest x back into buffer keeping in mind radius
-    #find y scale t bring largest y into buffer keeping in mind radius
-    #pick the scale thats smallest as the entire scale
-
-    #this scale gives us a size scale, now we have to find offset to center it in the window
-
-    #based on dimension scaling from for example y
-    #subtract minimum of y from all y vals
-    #this will put the minimum y on the top (because pygame draws top to bottom) and the maximum on the bottom
-
-    #subtract minimum x value from all x vals
-    #add half of windows x width - half of x span
 
     #scale objects size by this too
     if(objs == -1):
         return -1
     
-    print(objs)
     #copy array
     normalized = [[k for k in x] for x in objs]
 
@@ -93,8 +81,6 @@ def normalizeObjects(objs, windowWidth = 1600, windowHeight = 900, windowXOffset
 
             obj[2] += (windowHeight/2) - ((ySpan/xScale)/2)
 
-            obj[1] += windowXOffset
-            obj[2] += windowYOffset
 
     else:
         for obj in normalized:
@@ -108,21 +94,19 @@ def normalizeObjects(objs, windowWidth = 1600, windowHeight = 900, windowXOffset
 
             obj[1] += (windowWidth/2) - ((xSpan/yScale)/2)
 
-            obj[1] += windowXOffset
-            obj[2] += windowYOffset
 
-
-    print(normalized)
 
     return normalized
 
-def drawObjects(objs, screen, color = gold):
+
+#draws objects onto a window surface that will be rescaled
+def drawObjects(objs, window, color = gold):
 
     if objs == -1:
         return
 
     for x in objs[1:]:
-        pygame.draw.circle(screen, color, (x[1], x[2]), x[0])
+        pygame.draw.circle(window, color, (x[1], x[2]), x[0])
 
 
 
@@ -189,22 +173,27 @@ def keyUpEventHandler(event, movementStack, currState):
 
     return -1
 
-def drawCybot(screen, cybotSprite, color = (255, 0, 0)):
+def drawCybot(window, cybotSprite, color = (255, 0, 0)):
     #we have angle to draw
     if(len(cybotSprite) > 3):
-        pygame.draw.circle(screen, color, (cybotSprite[1], cybotSprite[2]), cybotSprite[0])
+        pygame.draw.circle(window, color, (cybotSprite[1], cybotSprite[2]), cybotSprite[0])
 
         frontDotSize = cybotSprite[0]/5
 
         xOffset = math.cos(cybotSprite[3] * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
         yOffset = math.sin(cybotSprite[3] * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
 
-        pygame.draw.circle(screen, (0,0,0), (cybotSprite[1] + xOffset, cybotSprite[2] + yOffset), frontDotSize)
+        pygame.draw.circle(window, (0,0,0), (cybotSprite[1] + xOffset, cybotSprite[2] + yOffset), frontDotSize)
     elif(len(cybotSprite) == 3):
         #can still draw just no front
-        pygame.draw.circle(screen, color, (cybotSprite[1], cybotSprite[2]), cybotSprite[0])
+        pygame.draw.circle(window, color, (cybotSprite[1], cybotSprite[2]), cybotSprite[0])
     else:
         print("Cannot Draw cybot")
+
+def updateField(window, objs):
+    window.fill((0,0,0,0))
+    drawObjects(objs, window)
+    drawCybot(window, objs[0])
 
 #inverts on y axis
 def invertObjects(objs):
@@ -216,16 +205,86 @@ def invertObjects(objs):
         x[2] = x[2] * -1
 
 
+#This is where all sizes of elements will be configured, except for things within the window which are a seperate surface and just scale to the window box
+#also called every time the display is resized
+def constructScreen(width, elements, state):
+    height = (width * 9)/16
+
+    windowWidth = width * (3/5)
+    windowHeight = height * (3/5)
+
+    windowXOffset = (width - windowWidth)/2
+    windowYOffset = ((height - windowHeight)/2) - height/10
+
+    fieldTabHeight = width/40
+    fieldTabWidth = width/20
+    fieldTabX = windowWidth/30
+
+    elements["Field_Tab"] = Rect((windowXOffset + fieldTabX, windowYOffset - fieldTabHeight) , (fieldTabWidth, fieldTabHeight))
+    elements["Scan_Tab"] = Rect((windowXOffset + fieldTabX + fieldTabWidth, windowYOffset - fieldTabHeight) , (fieldTabWidth, fieldTabHeight))
+
+    elements["Screen"] = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+    elements["Window_Rect"] = Rect((windowXOffset, windowYOffset) , (windowWidth, windowHeight))
+
+def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 50):
+    screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
+
+#actually draws elements on the screen
+def drawScreen(elements, state):
+    #keep in mind state determines which elements are displayed, constructing them basically just resizes
+    pygame.font.init()
+
+    font = "Helvetica"
+
+    windowColor = accentColor1
+    #draw elements
+    #based on state 
+    elements["Screen"].fill(darkRed)
+    pygame.draw.rect(elements["Screen"], windowColor, elements["Window_Rect"], border_radius=int(elements["Window_Rect"].x/20))
+
+    
+    fieldTabColor = warmGray
+    scanTabColor = warmGray
+
+    if(state["Window_Tab"] == "Field"):
+        elements["Screen"].blit(pygame.transform.scale(elements["Field_Surface"], (elements["Window_Rect"].width, elements["Window_Rect"].height)), (elements["Window_Rect"].x,elements["Window_Rect"].y))
+        fieldTabColor = windowColor
+    elif(state["Window_Tab"] == "Scan"):
+        elements["Screen"].blit(pygame.transform.scale(elements["Scan_Surface"], (elements["Window_Rect"].width, elements["Window_Rect"].height)), (elements["Window_Rect"].x,elements["Window_Rect"].y))
+        scanTabColor = windowColor
+    else:
+        pygame.draw.rect(elements["Screen"], warmGray, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
+    
+    pygame.draw.rect(elements["Screen"], scanTabColor, elements["Scan_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
+    pygame.draw.rect(elements["Screen"], fieldTabColor, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
+
+    writeOnRect(elements["Screen"], elements["Scan_Tab"], "Scan", darkRed)
+    writeOnRect(elements["Screen"], elements["Field_Tab"], "Field", darkRed)
+
+    pygame.display.update()
+
+
+#objects x, y, size(radius for circle, edge for square, either way can be linearly scaled), type stored in currField
+
 def main():
 
     pygame.init()
 
-    client = pending.pendingConnection()
+    client, width = pending.pendingConnection()
+
+    elements = {}
+    state = {"Window_Tab" : ""}
     
     #true if client valid
     running = client != -1
 
-    screen = pygame.display.set_mode((1600, 900))
+    #making a field surface the same size as the screen which will be projected into the inner window
+    elements["Field_Surface"] = pygame.Surface([width, (width * 9)/16], pygame.SRCALPHA, 32)
+    elements["Scan_Surface"] = pygame.Surface([width, (width * 9)/16], pygame.SRCALPHA, 32)
+
+    pygame.draw.circle(elements["Scan_Surface"], darkRed, (50, 50), 30)
+    pygame.draw.circle(elements["Scan_Surface"], darkRed, (50, 100), 30)
+    pygame.draw.ellipse(elements["Scan_Surface"], darkRed, Rect((50, 50), (100, 50)), 30)
 
 
     pygame.display.set_caption("Hello Pygame")
@@ -237,18 +296,6 @@ def main():
     objColor = gold
     movementStack = []
 
-    windowWidth = 1000
-    windowHeight = 500
-
-    windowXOffset = (screen.get_width() - windowWidth)/2
-
-    windowYOffset = ((screen.get_height() - windowHeight)/2) - screen.get_height()/10
-
-    windowBuffer = 30
-
-    #cybot for visual data, [size, x, y, angle]
-    cybotSprite = [0,0,0,0]
-
     #started Idle
     #I = Idle
     #W = Foward
@@ -259,16 +306,20 @@ def main():
     #cybot gets one command sent per change of action with an Idle signal between
     currState = "I"
 
+    constructScreen(width, elements, state)
 
     while (running and (message != "end")):
+
+        #draw screen background
+        #draw elements like buttons window inlay etc
+        #based on state call the specific tab draw function
+        #blit that scaled result to the screen
+
+        #on a resize, only the important elements like buttons and window size need to be resized not every little object or line on a graph or text in the console
+        
         message = ""
-        screen.fill(accentColor3)
 
-        pygame.draw.rect(screen, accentColor1, Rect((windowXOffset - windowBuffer/2, windowYOffset - windowBuffer/2), (windowWidth + windowBuffer, windowHeight + windowBuffer)), 0, 3)
-        drawObjects(currField, screen, objColor)
-        drawCybot(screen ,cybotSprite)
-
-        pygame.display.update()
+        drawScreen(elements, state)
         
         #websocket duty cycle
         for event in pygame.event.get():
@@ -276,6 +327,17 @@ def main():
 
             if event.type == pygame.QUIT:
                 running = False
+            
+            mouse = pygame.mouse.get_pos()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+
+                if(elements["Field_Tab"].collidepoint(mouse[0], mouse[1])):
+
+                    state["Window_Tab"] = "Field"
+                elif(elements["Scan_Tab"].collidepoint(mouse[0], mouse[1])):
+
+                    state["Window_Tab"] = "Scan"
             
             elif event.type == pygame.KEYDOWN:
                 newState = keyDownEventHandler(event, movementStack, currState)
@@ -288,8 +350,16 @@ def main():
             if (newState != -1):
                 currState = newState
                 print(currState)
-                client.send(currState.encode())          
+                client.send(currState.encode())    
+            
 
+            if event.type == pygame.VIDEORESIZE:
+                # The window was resized, update the screen size
+                width = event.size[0]
+                constructScreen(width, elements, state)
+                
+                
+                
         
         try:
             if(check_socket_data(client)):
@@ -303,27 +373,22 @@ def main():
                 message = recvString(client)
             
                 if(message[0:6] == "Field:"):
-
+                    #redraw the field
                     client.send(b"Received Field\n")
-                    pygame.display.set_caption("Current Field")
+
                     rawObjects = parseObjects(message)
-
                     invertObjects(rawObjects)
-                    objects = normalizeObjects(rawObjects, windowWidth, windowHeight, windowXOffset, windowYOffset)
 
-                    cybotSprite = objects[0]
-                    currField = objects[1:]
-
-
+                    objects = normalizeObjects(rawObjects, elements["Field_Surface"])
+                    updateField(elements["Field_Surface"], objects)
                 else:
-                    print("Message: " + message)
+                    print("Cybot: " + message)
                 
         except (ConnectionResetError):
-            client = pending.pendingConnection()
+            client, width = pending.pendingConnection()
             if(client == -1):
                 running = False
             
-            screen = pygame.display.set_mode((1600, 900))
 
 
 
