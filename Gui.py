@@ -9,6 +9,7 @@ import queue
 import pending
 from ISUColors import *
 import datetime
+import os
 
 
 def check_socket_data(sock):
@@ -320,8 +321,15 @@ def main():
     objColor = gold
     movementStack = []
 
+    logFolder = "Logs/" + datetime.datetime.now().strftime("%m-%d-%Y")
+
+    try:
+        os.mkdir(logFolder)
+    except:
+        pass
+
     #start logs
-    logFileName = "Logs/" + datetime.datetime.now().strftime("%Y-%m-%d/") + "log_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt"
+    logFileName = logFolder + "/log_" + datetime.datetime.now().strftime("%m-%d-%Y_%H-%M-%S") + ".txt"
 
     #started Idle
     #I = Idle
