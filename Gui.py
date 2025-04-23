@@ -220,14 +220,40 @@ def constructScreen(width, elements, state):
     fieldTabWidth = width/20
     fieldTabX = windowWidth/30
 
-    elements["Field_Tab"] = Rect((windowXOffset + fieldTabX, windowYOffset - fieldTabHeight) , (fieldTabWidth, fieldTabHeight))
-    elements["Scan_Tab"] = Rect((windowXOffset + fieldTabX + fieldTabWidth, windowYOffset - fieldTabHeight) , (fieldTabWidth, fieldTabHeight))
+    elements["Field_Tab"] = Rect((windowXOffset + fieldTabX, windowYOffset - fieldTabHeight + 3) , (fieldTabWidth, fieldTabHeight))
+    elements["Scan_Tab"] = Rect((windowXOffset + fieldTabX + fieldTabWidth, windowYOffset - fieldTabHeight + 3) , (fieldTabWidth, fieldTabHeight))
 
     elements["Screen"] = pygame.display.set_mode((width, height), pygame.RESIZABLE)
     elements["Window_Rect"] = Rect((windowXOffset, windowYOffset) , (windowWidth, windowHeight))
 
-def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 50):
+def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 100):
     screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
+
+#scan data comes in as irRaw, irDist, pingDist, angle
+def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing = True, xMin=0, xMax=180, yMin = 0, yMax = 200, IRRawMult = .01):
+    window.fill((0,0,0,0))
+
+    #what to multiply x by
+    xScale = window.get_width()/(xMax - xMin)
+    yScale = window.get_height()/(yMax - yMin)
+
+    pointSize = window.get_width()/100
+
+    IRRawColor = (255, 0, 0)
+    IRDistColor = (0,255,0)
+    pingDistColor = (0,0,255)
+
+    #copy and scale array
+    scaledData = [[(y[0] * IRRawMult * yScale) + yMin,(y[1] * yScale) + yMin, (y[2] * yScale) + yMin, (y[3] * xScale) + xMin] for y in scanData]
+
+    for point in scaledData:
+        
+        if(graphIRRaw):
+            pygame.draw.circle(window, IRRawColor, (point[3], window.get_height() - point[0]), pointSize)
+        if(graphIRDist):
+            pygame.draw.circle(window, IRDistColor, (point[3], window.get_height() - point[1]), pointSize)
+        if(graphPing):
+            pygame.draw.circle(window, pingDistColor, (point[3], window.get_height() - point[2]), pointSize)
 
 #actually draws elements on the screen
 def drawScreen(elements, state):
@@ -240,11 +266,20 @@ def drawScreen(elements, state):
     #draw elements
     #based on state 
     elements["Screen"].fill(darkRed)
-    pygame.draw.rect(elements["Screen"], windowColor, elements["Window_Rect"], border_radius=int(elements["Window_Rect"].x/20))
+    
 
     
-    fieldTabColor = warmGray
-    scanTabColor = warmGray
+    fieldTabColor = windowColor if state["Window_Tab"] == "Field" else warmGray
+    scanTabColor = windowColor if state["Window_Tab"] == "Scan" else warmGray
+    
+    pygame.draw.rect(elements["Screen"], scanTabColor, elements["Scan_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
+    pygame.draw.rect(elements["Screen"], fieldTabColor, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
+
+
+    writeOnRect(elements["Screen"], elements["Scan_Tab"], "Scan", darkRed)
+    writeOnRect(elements["Screen"], elements["Field_Tab"], "Field", darkRed)
+
+    pygame.draw.rect(elements["Screen"], windowColor, elements["Window_Rect"], border_radius=int(elements["Window_Rect"].x/20))
 
     if(state["Window_Tab"] == "Field"):
         elements["Screen"].blit(pygame.transform.scale(elements["Field_Surface"], (elements["Window_Rect"].width, elements["Window_Rect"].height)), (elements["Window_Rect"].x,elements["Window_Rect"].y))
@@ -252,14 +287,6 @@ def drawScreen(elements, state):
     elif(state["Window_Tab"] == "Scan"):
         elements["Screen"].blit(pygame.transform.scale(elements["Scan_Surface"], (elements["Window_Rect"].width, elements["Window_Rect"].height)), (elements["Window_Rect"].x,elements["Window_Rect"].y))
         scanTabColor = windowColor
-    else:
-        pygame.draw.rect(elements["Screen"], warmGray, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
-    
-    pygame.draw.rect(elements["Screen"], scanTabColor, elements["Scan_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
-    pygame.draw.rect(elements["Screen"], fieldTabColor, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
-
-    writeOnRect(elements["Screen"], elements["Scan_Tab"], "Scan", darkRed)
-    writeOnRect(elements["Screen"], elements["Field_Tab"], "Field", darkRed)
 
     pygame.display.update()
 
@@ -281,10 +308,6 @@ def main():
     #making a field surface the same size as the screen which will be projected into the inner window
     elements["Field_Surface"] = pygame.Surface([width, (width * 9)/16], pygame.SRCALPHA, 32)
     elements["Scan_Surface"] = pygame.Surface([width, (width * 9)/16], pygame.SRCALPHA, 32)
-
-    pygame.draw.circle(elements["Scan_Surface"], darkRed, (50, 50), 30)
-    pygame.draw.circle(elements["Scan_Surface"], darkRed, (50, 100), 30)
-    pygame.draw.ellipse(elements["Scan_Surface"], darkRed, Rect((50, 50), (100, 50)), 30)
 
 
     pygame.display.set_caption("Hello Pygame")
@@ -381,6 +404,11 @@ def main():
 
                     objects = normalizeObjects(rawObjects, elements["Field_Surface"])
                     updateField(elements["Field_Surface"], objects)
+
+                elif(message[0:5] == "Scan:"):
+                    scanData = parseObjects(message)
+                    graphScan(elements["Scan_Surface"], scanData)
+
                 else:
                     print("Cybot: " + message)
                 
