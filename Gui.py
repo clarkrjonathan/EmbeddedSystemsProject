@@ -8,6 +8,7 @@ import threading
 import queue
 import pending
 from ISUColors import *
+import datetime
 
 
 def check_socket_data(sock):
@@ -319,6 +320,9 @@ def main():
     objColor = gold
     movementStack = []
 
+    #start logs
+    logFileName = "Logs/" + datetime.datetime.now().strftime("%Y-%m-%d/") + "log_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt"
+
     #started Idle
     #I = Idle
     #W = Foward
@@ -413,7 +417,7 @@ def main():
                 else:
                     print("Cybot: " + message)
                 
-                with open("Logs.txt", "a") as file:
+                with open(logFileName, "a") as file:
                     file.write(message)
                 
         except (ConnectionResetError):
