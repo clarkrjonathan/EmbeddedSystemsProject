@@ -230,7 +230,7 @@ def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 100):
     screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
 
 #scan data comes in as irRaw, irDist, pingDist, angle
-def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing = True, xMin=0, xMax=180, yMin = 0, yMax = 200, IRRawMult = .01):
+def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing = True, xMin=0, xMax=180, yMin = 0, yMax = 200, IRRawMult = .1):
     window.fill((0,0,0,0))
 
     #what to multiply x by
@@ -408,9 +408,13 @@ def main():
                 elif(message[0:5] == "Scan:"):
                     scanData = parseObjects(message)
                     graphScan(elements["Scan_Surface"], scanData)
+                    print(message)
 
                 else:
                     print("Cybot: " + message)
+                
+                with open("Logs.txt", "a") as file:
+                    file.write(message)
                 
         except (ConnectionResetError):
             client, width = pending.pendingConnection()
