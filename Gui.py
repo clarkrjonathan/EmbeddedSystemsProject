@@ -10,6 +10,7 @@ import pending
 from ISUColors import *
 import datetime
 import os
+import cmath
 
 
 def check_socket_data(sock):
@@ -231,22 +232,42 @@ def constructScreen(width, elements, state):
 def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 100):
     screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
 
+
+def getIRDist(rawIR):
+    if(rawIR == 0):
+        raise ValueError
+
+    exp = -0.54574863529
+    a = 9561.29245589
+
+    x = rawIR/a
+    y = 1/exp
+
+
+    dist = math.pow(x, y)
+
+    return dist
+
 #scan data comes in as irRaw, irDist, pingDist, angle
-def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing = True, xMin=0, xMax=180, yMin = 0, yMax = 200, IRRawMult = .1):
+def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing = True, normalizeRawIR = True, xMin=0, xMax=180, yMin = 0, yMax = 200):
     window.fill((0,0,0,0))
+
 
     #what to multiply x by
     xScale = window.get_width()/(xMax - xMin)
     yScale = window.get_height()/(yMax - yMin)
 
-    pointSize = window.get_width()/100
+    pointSize = window.get_width()/120
 
-    IRRawColor = (255, 0, 0)
-    IRDistColor = (0,255,0)
-    pingDistColor = (0,0,255)
+    IRRawColor = (230, 0, 0)
+    IRDistColor = (0,230,0)
+    pingDistColor = (0,0,230)
 
     #copy and scale array
-    scaledData = [[(y[0] * IRRawMult * yScale) + yMin,(y[1] * yScale) + yMin, (y[2] * yScale) + yMin, (y[3] * xScale) + xMin] for y in scanData]
+    if(normalizeRawIR):
+        scaledData = [[(getIRDist(y[0])  * yScale) + yMin,(y[1] * yScale) + yMin, (y[2] * yScale) + yMin, (y[3] * xScale) + xMin] for y in scanData]
+    else:
+        scaledData = [[(y[0]  * yScale) + yMin,(y[1] * yScale) + yMin, (y[2] * yScale) + yMin, (y[3] * xScale) + xMin] for y in scanData]
 
     for point in scaledData:
         
@@ -324,9 +345,10 @@ def main():
     logFolder = "Logs/" + datetime.datetime.now().strftime("%m-%d-%Y")
 
     try:
+        os.mkdir("Logs")
         os.mkdir(logFolder)
     except:
-        pass
+        print("Couldn't make dir")
 
     #start logs
     logFileName = logFolder + "/log_" + datetime.datetime.now().strftime("%m-%d-%Y_%H-%M-%S") + ".txt"
@@ -421,6 +443,10 @@ def main():
                     scanData = parseObjects(message)
                     graphScan(elements["Scan_Surface"], scanData)
                     print(message)
+                
+                elif(message[0:13] == "IR Calibrate:"):
+                    with open ("IRCalibrationData.csv", "a") as file:
+                        file.write(message)
 
                 else:
                     print("Cybot: " + message)
