@@ -183,8 +183,8 @@ def drawCybot(window, cybotSprite, color = (255, 0, 0)):
 
         frontDotSize = cybotSprite[0]/5
 
-        xOffset = math.cos(cybotSprite[3] * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
-        yOffset = math.sin(cybotSprite[3] * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
+        xOffset = math.cos((cybotSprite[3]) * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
+        yOffset = math.sin((cybotSprite[3]) * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
 
         pygame.draw.circle(window, (0,0,0), (cybotSprite[1] + xOffset, cybotSprite[2] + yOffset), frontDotSize)
     elif(len(cybotSprite) == 3):
@@ -344,11 +344,12 @@ def main():
 
     logFolder = "Logs/" + datetime.datetime.now().strftime("%m-%d-%Y")
 
-    try:
+    if (not(os.path.isdir("Logs"))):
         os.mkdir("Logs")
+
+    if (not(os.path.isdir(logFolder))):
         os.mkdir(logFolder)
-    except:
-        print("Couldn't make dir")
+
 
     #start logs
     logFileName = logFolder + "/log_" + datetime.datetime.now().strftime("%m-%d-%Y_%H-%M-%S") + ".txt"
@@ -406,7 +407,7 @@ def main():
             #change in state
             if (newState != -1):
                 currState = newState
-                print(currState)
+                #print(currState)
                 client.send(currState.encode())    
             
 
@@ -431,10 +432,8 @@ def main():
             
                 if(message[0:6] == "Field:"):
                     #redraw the field
-                    client.send(b"Received Field\n")
 
                     rawObjects = parseObjects(message)
-                    invertObjects(rawObjects)
 
                     objects = normalizeObjects(rawObjects, elements["Field_Surface"])
                     updateField(elements["Field_Surface"], objects)
