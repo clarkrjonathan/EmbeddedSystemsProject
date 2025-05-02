@@ -72,10 +72,6 @@ int main(void)
     oi_update(cybot);
     cyBOT_init_Scan();
 
-    send_string_gui("Field:\n50, 500, 500");
-
-    send_string_gui("Color: 255, 250, 250");
-
     int cliffStatus = 0;
 
     int firstCliffTrigger = 1;
@@ -89,21 +85,26 @@ int main(void)
     cybotPos.x = 0;
     cybotPos.y = 0;
     float cybotAngle = 0;
+    int loopCount = 0;
 
     cyBOT_Scan_t scan_data[200];
 
     while (1)
     {
+        loopCount += 1;
+
         //every loop before we update we should add our movement vector changes
         //we should only have a change in distance or a change in angle not both
         //only change in either of these when our command changes
 
         //every time we stop moving or switch direction we need to add the vector
-        cybotAngle += cybot->angle;
+        cybotAngle -= cybot->angle;
+
+        float distCorrection = 1.34;
 
         vector movement;
         movement.x = cybotAngle;
-        movement.y = cybot->distance;
+        movement.y = cybot->distance * (distCorrection);
 
         movement.isPolar = 1;
         //
@@ -114,6 +115,12 @@ int main(void)
             cybotAngle -= 360;
         } else if(cybotAngle < 0) {
             cybotAngle += 360;
+        }
+
+        if(loopCount % 1 == 0) {
+            char message[50];
+            sprintf(message, "Position:\n%.2f, %.2f, %.2f", cybotPos.x, cybotPos.y, cybotAngle);
+            send_string_gui(message);
         }
 
 
@@ -130,6 +137,7 @@ int main(void)
             //hole found
             if(firstCliffTrigger) {
                 command_byte = 'I';
+                send_string_gui("I");
                 send_string_gui("Found hole");
                 firstCliffTrigger = 0;
             }
@@ -144,6 +152,7 @@ int main(void)
 
             if(firstBumpTrigger) {
                 command_byte = 'I';
+                send_string_gui("I");
                 if(cybot->bumpLeft) {
                     send_string_gui("Bumped left");
                 }
@@ -161,10 +170,7 @@ int main(void)
         //don't do time consuming operations within each loop, we need to be free to recieve next data
 
         if(command_flag) {
-            //echo for debugging
-            uart_sendChar(0b110);
-            uart_sendChar(command_byte);
-            uart_sendChar(0b0);
+
             command_flag = 0;
         }
 
@@ -209,12 +215,20 @@ int main(void)
 
         if(scanning) {
             if(currAngle > 180) {
+
+
                 sendScan(scan_data, 180);
                 sendIRPoints(scan_data, 180, cybotPos, cybotAngle);
                 scanning = 0;
                 command_byte = 'I';
             } else {
                 cyBOT_Scan(currAngle, &scan_data[currAngle]);
+                if(currAngle % 10 == 0) {
+                    char message[20];
+
+                    sprintf(message, "Angle: %d", currAngle);
+                    send_string_gui(message);
+                }
                 currAngle += 1;
             }
 
