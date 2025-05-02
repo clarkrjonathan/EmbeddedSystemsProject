@@ -34,6 +34,20 @@ def recvString(client):
         byte = client.recv(1)
     
     return message 
+
+#if its the initial scan it will just initialize to the objects
+def updateScale(objs, scale, initialScale = True):
+    xMin = min([x[1] for x in objs])
+    yMin = min([x[2] for x in objs])
+
+    xMax = max([x[1] for x in objs])
+    yMax = max([x[2] for x in objs])
+
+    scale["xMin"]  = xMin if (xMin < scale["xMin"]) or initialScale else scale["xMin"]
+    scale["xMax"] = xMax if (xMax > scale["xMax"]) or initialScale else scale["xMax"]
+
+    scale["yMin"] =  yMin if (yMin < scale["yMin"]) or initialScale else scale["yMin"]
+    scale["yMax"] = yMax if (yMax > scale["yMax"]) or initialScale else scale["yMax"]
     
 
 #may need to add some sort of stop message if I can't send the whole field in one but I should be able to
@@ -43,7 +57,7 @@ def parseObjects(message):
     return objs
 
 #normalizes objects to be within a certain span at a specified offset
-def normalizeObjects(objs, windowSurface):
+def normalizeObjects(objs, windowSurface, scale):
     windowWidth = windowSurface.get_width()
     windowHeight = windowSurface.get_height()
 
@@ -57,17 +71,14 @@ def normalizeObjects(objs, windowSurface):
     #copy array
     normalized = [[k for k in x] for x in objs]
 
-    maxR = max([x[0] for x in objs])
 
-    xMin = min([x[1] for x in objs]) - maxR
-    xMax = max([x[1] for x in objs]) + maxR
-    xSpan = xMax - xMin
+    xMin = scale["xMin"]
+    yMin = scale["yMin"]
+
+    xSpan = scale["xMax"] - scale["xMin"]
     xScale = xSpan/windowWidth
-
-
-    yMin = min([x[2] for x in objs]) - maxR
-    yMax = max([x[2] for x in objs]) + maxR
-    ySpan = yMax - yMin
+    
+    ySpan = scale["yMax"] - scale["yMin"]
     yScale = ySpan/windowHeight
 
 
@@ -151,17 +162,21 @@ def keyUpEventHandler(event, movementStack, currState):
     if(len(movementStack) == 0):
         return -1
     
-    if(event.key == pygame.K_w):
-        movementStack.remove("W")
+    try:
+        if(event.key == pygame.K_w):
+            movementStack.remove("W")
 
-    elif(event.key == pygame.K_s):
-        movementStack.remove("S")
+        elif(event.key == pygame.K_s):
+            movementStack.remove("S")
     
-    elif(event.key == pygame.K_d):
-        movementStack.remove("D")
+        elif(event.key == pygame.K_d):
+            movementStack.remove("D")
 
-    elif(event.key == pygame.K_a):
-        movementStack.remove("A")
+        elif(event.key == pygame.K_a):
+            movementStack.remove("A")
+    except:
+        pass
+    
 
     if(len(movementStack) > 0):
 
@@ -176,27 +191,61 @@ def keyUpEventHandler(event, movementStack, currState):
 
     return -1
 
+#draw cybot
+#cybotSprite is a list of x, y, angle, radius
 def drawCybot(window, cybotSprite, color = (255, 0, 0)):
     #we have angle to draw
     if(len(cybotSprite) > 3):
-        pygame.draw.circle(window, color, (cybotSprite[1], cybotSprite[2]), cybotSprite[0])
+        pygame.draw.circle(window, color, (cybotSprite[0], cybotSprite[1]), cybotSprite[3])
 
-        frontDotSize = cybotSprite[0]/5
+        frontDotSize = cybotSprite[3]/5
 
-        xOffset = math.cos((cybotSprite[3]) * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
-        yOffset = math.sin((cybotSprite[3]) * (math.pi/180)) * (cybotSprite[0] - frontDotSize)
+        xOffset = math.cos((cybotSprite[2]) * (math.pi/180)) * (cybotSprite[3] - frontDotSize)
+        yOffset = math.sin((cybotSprite[2]) * (math.pi/180)) * (cybotSprite[3] - frontDotSize)
 
-        pygame.draw.circle(window, (0,0,0), (cybotSprite[1] + xOffset, cybotSprite[2] + yOffset), frontDotSize)
-    elif(len(cybotSprite) == 3):
-        #can still draw just no front
-        pygame.draw.circle(window, color, (cybotSprite[1], cybotSprite[2]), cybotSprite[0])
+        pygame.draw.circle(window, (0,0,0), (cybotSprite[0] + xOffset, cybotSprite[1] + yOffset), frontDotSize)
     else:
         print("Cannot Draw cybot")
 
-def updateField(window, objs):
-    window.fill((0,0,0,0))
-    drawObjects(objs, window)
-    drawCybot(window, objs[0])
+#redraws field surface when the data changes which is anytime we receive a new cybot position or fieldData
+def updateField(surface, fieldScans, cybot, scale, cybotRadius = 170, pointRadius = 20):
+    windowWidth = surface.get_width()
+    windowHeight = surface.get_height()
+    
+    surface.fill((0,0,0,0))
+    for scan in fieldScans:
+        normalizedScan = normalizeObjects(scan, surface, scale)
+        drawObjects(normalizedScan, surface)
+
+    scaledcybot = [x for x in cybot]
+    scaledcybot.append(cybotRadius)
+
+    scaledcybot[0] -= scale["xMin"]
+    scaledcybot[1] -= scale["yMin"]
+
+    xSpan = scale["xMax"] - scale["xMin"]
+    xScale = (xSpan)/windowWidth
+    
+    ySpan = scale["yMax"] - scale["yMin"]
+    yScale = (ySpan)/windowHeight
+
+
+
+    if((xScale > yScale) and (xScale != 0)):
+        scaledcybot[0] /= xScale
+        scaledcybot[1] /= xScale
+        scaledcybot[3] /= xScale
+
+        scaledcybot[1] += (windowHeight/2) - ((ySpan/xScale)/2)
+
+    elif ((yScale != 0)):
+        scaledcybot[0] /= yScale
+        scaledcybot[1] /= yScale
+        scaledcybot[3] /= yScale
+
+        scaledcybot[0] += (windowWidth/2) - ((xSpan/yScale)/2)
+
+    drawCybot(surface, scaledcybot)
 
 #inverts on y axis
 def invertObjects(objs):
@@ -324,6 +373,7 @@ def main():
 
     elements = {}
     state = {"Window_Tab" : ""}
+    state["FirstScan"] = True
     
     #true if client valid
     running = client != -1
@@ -332,6 +382,12 @@ def main():
     elements["Field_Surface"] = pygame.Surface([width, (width * 9)/16], pygame.SRCALPHA, 32)
     elements["Scan_Surface"] = pygame.Surface([width, (width * 9)/16], pygame.SRCALPHA, 32)
 
+    #list of multiple scans, every time there is a new object list it will be appended
+    #this always will be the raw data straight from cybot meaning the absolute positions in the room of points
+    fieldScans = []
+
+    #values needed to scale any object to fit within other boundaries
+    scale = {"xMin" : 0, "xMax" : 500, "yMin" : 0, "yMax" : 500}
 
     pygame.display.set_caption("Hello Pygame")
     pygame.display.update()
@@ -341,6 +397,9 @@ def main():
     currField = -1
     objColor = gold
     movementStack = []
+
+    cybot = [0,0,0,0]
+    
 
     logFolder = "Logs/" + datetime.datetime.now().strftime("%m-%d-%Y")
 
@@ -396,6 +455,7 @@ def main():
                 elif(elements["Scan_Tab"].collidepoint(mouse[0], mouse[1])):
 
                     state["Window_Tab"] = "Scan"
+                    
             
             elif event.type == pygame.KEYDOWN:
                 newState = keyDownEventHandler(event, movementStack, currState)
@@ -434,9 +494,17 @@ def main():
                     #redraw the field
 
                     rawObjects = parseObjects(message)
+                    if(state["FirstScan"]):
+                        state["FirstScan"]= False
 
-                    objects = normalizeObjects(rawObjects, elements["Field_Surface"])
-                    updateField(elements["Field_Surface"], objects)
+                    fieldScans.append(rawObjects)
+
+                    #don't bother updating the field here because the field will be updated when we receive the cybot position and will just be overwritten
+                    #all we need to do here is add points to fieldScan and update our scale which could end up just being overridden by the cybot
+                    updateScale(rawObjects, scale, state["FirstScan"])
+
+                    objects = normalizeObjects(rawObjects, elements["Field_Surface"], scale)
+
 
                 elif(message[0:5] == "Scan:"):
                     scanData = parseObjects(message)
@@ -446,6 +514,33 @@ def main():
                 elif(message[0:13] == "IR Calibrate:"):
                     with open ("IRCalibrationData.csv", "a") as file:
                         file.write(message)
+
+                #cybot sent its position as x, y, angle
+                elif(message[0:9] == "Position:"):
+                    #save cybot position
+                    cybot = [float(x) for x in message.splitlines()[1].split(", ")]
+
+                    #update scaling if cybot is outside window
+                    if(cybot[0] < scale["xMin"]):
+                        scale["xMin"] = cybot[0]
+                    elif(cybot[0] > scale["xMax"]):
+                        scale["xMax"] = cybot[0]
+                    
+                    if(cybot[1]  < scale["yMin"]):
+                        scale["yMin"] = cybot[1]
+                    elif (cybot[1] > scale["yMax"]):
+                        scale["yMax"] = cybot[1]
+                    
+                    updateField(elements["Field_Surface"], fieldScans, cybot, scale)
+
+                    
+                
+                #cybot is telling the gui to force idle
+                elif(message == "I"):
+                    #clearing movement stack ensures we don't accidentally keep moving
+                    #may want to block movement for like half a second but I think that would be easier to do on the cybot side
+                    movementStack.clear()
+                    currState = "I"
 
                 else:
                     print("Cybot: " + message)
