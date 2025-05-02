@@ -208,7 +208,7 @@ def drawCybot(window, cybotSprite, color = (255, 0, 0)):
         print("Cannot Draw cybot")
 
 #redraws field surface when the data changes which is anytime we receive a new cybot position or fieldData
-def updateField(surface, fieldScans, cybot, scale, cybotRadius = 170, pointRadius = 20):
+def updateField(surface, fieldScans, cybot, scale, cybotRadius = 185, pointRadius = 20):
     windowWidth = surface.get_width()
     windowHeight = surface.get_height()
     
@@ -398,7 +398,7 @@ def main():
     objColor = gold
     movementStack = []
 
-    cybot = [0,0,0,0]
+    cybot = [0,0,0]
     
 
     logFolder = "Logs/" + datetime.datetime.now().strftime("%m-%d-%Y")
