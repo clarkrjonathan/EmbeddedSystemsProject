@@ -20,4 +20,5 @@ oi_loadSong(1, 12, mcdonald_notes, mcdonald_note_duration);
 oi_loadSong(2, 15, junglebeat_notes,junglebeat_note_duration);
 oi_loadSong(3, 16, twinkle_notes,twinkle_durations);
 oi_loadSong(4,16,rowboat_notes,rowboat_note_duration);
+// to play song use function oi_play_song(1-4);
 }
