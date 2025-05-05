@@ -148,11 +148,15 @@ int main(void)
         }
 
         //bump sensor handling
+        //if cybot bumped in center then both bum signals triggered
         if(cybot->bumpLeft || cybot->bumpRight) {
 
             if(firstBumpTrigger) {
                 command_byte = 'I';
                 send_string_gui("I");
+                //if((cybot->bumpLeft) && (cybot->bumpRight)){
+                //    send_string_gui("Bumped center");
+                //}
                 if(cybot->bumpLeft) {
                     send_string_gui("Bumped left");
                 }
