@@ -1,4 +1,4 @@
-void loadsongs(){
+void loadsongs(void){
 unsigned char mcdonald_notes [12] = {67, 67, 67, 62, 64, 64, 62, 71, 71 ,69, 69, 67};// in tune old mcdonald
 unsigned char mcdonald_note_duration[12] =  {32, 32, 32, 32, 32, 32, 64, 32, 32, 32, 32, 96}; //note duration for old mcdonald
 
