@@ -211,11 +211,17 @@ def drawCybot(window, cybotSprite, color = (255, 0, 0)):
 def updateField(surface, fieldScans, cybot, scale, cybotRadius = 185, pointRadius = 20):
     windowWidth = surface.get_width()
     windowHeight = surface.get_height()
+
+    alphaMult = 25
     
     surface.fill((0,0,0,0))
-    for scan in fieldScans:
+    for i in range(len(fieldScans)):
+        scan = fieldScans[i]
         normalizedScan = normalizeObjects(scan, surface, scale)
-        drawObjects(normalizedScan, surface)
+        alphaVal = (255 - ((len(fieldScans) - i) * alphaMult))
+        alphaVal = 255 if alphaVal < 0 else alphaVal
+
+        drawObjects(normalizedScan, surface, (gold[0], gold[1], gold[2],  ))
 
     scaledcybot = [x for x in cybot]
     scaledcybot.append(cybotRadius)
@@ -278,6 +284,15 @@ def constructScreen(width, elements, state):
     elements["Screen"] = pygame.display.set_mode((width, height), pygame.RESIZABLE)
     elements["Window_Rect"] = Rect((windowXOffset, windowYOffset) , (windowWidth, windowHeight))
 
+    
+    trimButtonWidth = width/10
+    trimButtonHeight = width/20
+    trimButtonX = width/15
+    trimButtonY = height/2 + trimButtonHeight
+
+    elements["Trim_Plus"] = Rect((trimButtonX, trimButtonY), (trimButtonWidth, trimButtonHeight))
+    elements["Trim_Minus"] = Rect((trimButtonX, trimButtonY + (4 * trimButtonHeight)/3), (trimButtonWidth, trimButtonHeight))
+
 def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 100):
     screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
 
@@ -334,7 +349,7 @@ def drawScreen(elements, state):
 
     font = "Helvetica"
 
-    windowColor = accentColor1
+    windowColor = (0,0,0)
     #draw elements
     #based on state 
     elements["Screen"].fill(darkRed)
@@ -346,10 +361,17 @@ def drawScreen(elements, state):
     
     pygame.draw.rect(elements["Screen"], scanTabColor, elements["Scan_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
     pygame.draw.rect(elements["Screen"], fieldTabColor, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
+    
+    pygame.draw.rect(elements["Screen"], warmGray, elements["Trim_Plus"])
+    pygame.draw.rect(elements["Screen"], warmGray, elements["Trim_Minus"])
 
+    writeOnRect(elements["Screen"], elements["Trim_Plus"], "Right Trim", darkRed)
+    writeOnRect(elements["Screen"], elements["Trim_Minus"], "Left Trim", darkRed)
 
     writeOnRect(elements["Screen"], elements["Scan_Tab"], "Scan", darkRed)
     writeOnRect(elements["Screen"], elements["Field_Tab"], "Field", darkRed)
+
+
 
     pygame.draw.rect(elements["Screen"], windowColor, elements["Window_Rect"], border_radius=int(elements["Window_Rect"].x/20))
 
@@ -455,6 +477,12 @@ def main():
                 elif(elements["Scan_Tab"].collidepoint(mouse[0], mouse[1])):
 
                     state["Window_Tab"] = "Scan"
+                elif(elements["Trim_Plus"].collidepoint(mouse[0], mouse[1])):
+                    trim = "R"
+                    client.send(trim.encode())
+                elif(elements["Trim_Minus"].collidepoint(mouse[0], mouse[1])):
+                    trim = "L"
+                    client.send(trim.encode())
                     
             
             elif event.type == pygame.KEYDOWN:
