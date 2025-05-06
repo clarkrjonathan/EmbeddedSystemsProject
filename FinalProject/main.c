@@ -12,7 +12,6 @@
 #include <stdbool.h>
 #include "driverlib/interrupt.h"
 #include "open_interface.h"
-#include "movement.h"
 #include "math.h"
 // #include "button.h"
 
@@ -45,6 +44,7 @@ typedef struct
 #define boundry_right 6
 #define M_PI 3.14159265358979323846
 #define speed 150
+#define distCorrection 1
 
 void send_string_gui(const char *message);
 int checkForCliffs(oi_t *cybot);
@@ -56,10 +56,13 @@ vector addVector (vector a, vector b);
 void sendIRPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, float cybotAngle);
 vector getAbsolutePoint(vector point, vector cybotPos, float cybotAngle);
 vector toPolar(vector v);
+void move(int leftWheel, int rightWheel);
 
 
 extern volatile char command_byte;
 extern volatile int command_flag;
+
+float trim = 0.981;
 
 int main(void)
 {
@@ -97,17 +100,17 @@ int main(void)
         //we should only have a change in distance or a change in angle not both
         //only change in either of these when our command changes
 
-        //every time we stop moving or switch direction we need to add the vector
-        cybotAngle -= cybot->angle;
 
-        float distCorrection = 1.34;
 
         vector movement;
-        movement.x = cybotAngle;
-        movement.y = cybot->distance * (distCorrection);
 
+        cybotAngle -= cybot->angle;
+        float distTraveled = cybot->distance * (distCorrection);
+
+        movement.x = cybotAngle;
+        movement.y = distTraveled;
         movement.isPolar = 1;
-        //
+
         cybotPos = addVector(movement, cybotPos);
 
         //roll over angle just because it looks nicer
@@ -119,7 +122,7 @@ int main(void)
 
         if(loopCount % 1 == 0) {
             char message[50];
-            sprintf(message, "Position:\n%.2f, %.2f, %.2f", cybotPos.x, cybotPos.y, cybotAngle);
+            sprintf(message, "Position:\n%.2f, %.2f, %.2f\n", cybotPos.x, cybotPos.y, cybotAngle);
             send_string_gui(message);
         }
 
@@ -142,21 +145,17 @@ int main(void)
                 firstCliffTrigger = 0;
             }
 
-            //oi_setWheels(0, 0);
+
         } else {
             firstCliffTrigger = 1;
         }
 
         //bump sensor handling
-        //if cybot bumped in center then both bum signals triggered
         if(cybot->bumpLeft || cybot->bumpRight) {
 
             if(firstBumpTrigger) {
                 command_byte = 'I';
                 send_string_gui("I");
-                //if((cybot->bumpLeft) && (cybot->bumpRight)){
-                //    send_string_gui("Bumped center");
-                //}
                 if(cybot->bumpLeft) {
                     send_string_gui("Bumped left");
                 }
@@ -181,28 +180,27 @@ int main(void)
 
         switch(command_byte) {
         case 'W':
-            oi_setWheels(speed, speed);
+            move(speed, speed);
             scanning = 0;
             break;
 
         case 'S':
-            oi_setWheels(-speed,-speed);
+            move(-speed,-speed);
             scanning = 0;
             break;
 
         case 'A':
-            oi_setWheels(speed, -speed);
+            move(speed, -speed);
             scanning = 0;
             break;
 
         case 'D':
-            oi_setWheels(-speed
-                         , speed);
+            move(-speed , speed);
             scanning = 0;
             break;
 
         case '_':
-            oi_setWheels(0, 0);
+            move(0, 0);
             if(scanning == 0) {
                 scanning = 1;
                 currAngle = 0;
@@ -211,8 +209,26 @@ int main(void)
 
             break;
 
+        case 'L':
+            if(trim > .001) {
+                trim -= .001;
+            }
+
+            char trimMessage[20];
+            sprintf(trimMessage, "Trim: %f", trim);
+            send_string_gui(trimMessage);
+            command_byte = 'I';
+            break;
+
+        case 'R':
+            trim += .001;
+            sprintf(trimMessage, "Trim: %f", trim);
+            send_string_gui(trimMessage);
+            command_byte = 'I';
+            break;
+
         default:
-            oi_setWheels(0, 0);
+            move(0, 0);
             break;
 
         }
@@ -435,6 +451,10 @@ int checkForCliffs(oi_t *cybot)
     {
         return 0; // all clear no boundries or holes
     }
+}
+
+void move(int rightWheel, int leftWheel) {
+    oi_setWheels(rightWheel * (1/trim), leftWheel * (trim));
 }
 
 void send_string_gui(const char *message)

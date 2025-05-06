@@ -14,7 +14,7 @@ uint32_t calibratedLeft = 34650;
 uint32_t calibratedRight = 7760;
 float currAngle = 90;
 int timeMult = 15;
-int timeBias = 100;
+int timeBias = 50;
 
 void servo_init(void)
 {
