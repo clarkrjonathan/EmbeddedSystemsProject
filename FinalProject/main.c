@@ -156,6 +156,9 @@ int main(void)
             if(firstBumpTrigger) {
                 command_byte = 'I';
                 send_string_gui("I");
+                if((cybot->bumpLeft) && (cybot->bumpRight)){
+                    send_string_gui("Bumped center");
+                }
                 if(cybot->bumpLeft) {
                     send_string_gui("Bumped left");
                 }
