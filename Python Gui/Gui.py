@@ -122,6 +122,35 @@ def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing
         if(graphPing):
             pygame.draw.circle(window, pingDistColor, (point[3], window.get_height() - point[2]), pointSize)
 
+def zoom(scale, cybot):
+    cybot[2] = cybot[2] % 360
+
+    #pointing positive x
+    if(cybot[2] > 315 or cybot[2] < 45):
+        scale["xMin"] = cybot[0]
+        scale["xMax"] = cybot[0] + 1000
+        scale["yMin"] = cybot[1] - 300
+        scale["yMax"] = cybot[1] + 300
+    #pointing positive y
+    elif(cybot[2] > 45 and cybot[2] < 135):
+        scale["xMin"] = cybot[0] - 300
+        scale["xMax"] = cybot[0] + 300
+        scale["yMin"] = cybot[1]
+        scale["yMax"] = cybot[1] + 1000
+    #pointing negative x
+    elif(cybot[2] > 135 and cybot[2] < 225):
+        scale["xMin"] = cybot[0] - 1000
+        scale["xMax"] = cybot[0]
+        scale["yMin"] = cybot[1] - 300
+        scale["yMax"] = cybot[1] + 300
+    #pointing negative y
+    elif(cybot[2] > 225 and cybot[2] < 315):
+        scale["xMin"] = cybot[0] - 300
+        scale["xMax"] = cybot[0] + 300
+        scale["yMin"] = cybot[1] - 1000
+        scale["yMax"] = cybot[1]
+
+
 #objects x, y, size(radius for circle, edge for square, either way can be linearly scaled), type stored in currField
 
 def main():
@@ -198,6 +227,7 @@ def main():
         message = ""
 
         drawScreen(elements, state)
+
         
         #websocket duty cycle
         for event in pygame.event.get():
@@ -229,10 +259,19 @@ def main():
             
             elif event.type == pygame.KEYDOWN:
                 newState = keyDownEventHandler(event, movementStack, currState)
+                if(event.key == pygame.K_f):
+                    message = "F"
+                    client.send(message.encode())
                 
 
             elif event.type == pygame.KEYUP:
                 newState = keyUpEventHandler(event, movementStack, currState)
+                if (event.key == pygame.K_LSHIFT):
+
+                    if(len(otherObjects)>0):
+                        updateScale(otherObjects, scale, state["FirstScan"])
+                    for scan in fieldScans:
+                        updateScale(scan, scale, state["FirstScan"])
 
             #change in state
             if (newState != -1):
@@ -290,16 +329,21 @@ def main():
                     #save cybot position
                     cybot = [float(x) for x in message.splitlines()[1].split(", ")]
 
-                    #update scaling if cybot is outside window
-                    if(cybot[0] < scale["xMin"]):
-                        scale["xMin"] = cybot[0]
-                    elif(cybot[0] > scale["xMax"]):
-                        scale["xMax"] = cybot[0]
-                    
-                    if(cybot[1]  < scale["yMin"]):
-                        scale["yMin"] = cybot[1]
-                    elif (cybot[1] > scale["yMax"]):
-                        scale["yMax"] = cybot[1]
+                    #check if pressing shift to zoom
+                    pressed = pygame.key.get_pressed()
+                    if(pressed[pygame.K_LSHIFT]):
+                        zoom(scale, cybot)
+                    else:
+                        #update scaling if cybot is outside window
+                        if(cybot[0] < scale["xMin"]):
+                            scale["xMin"] = cybot[0]
+                        elif(cybot[0] > scale["xMax"]):
+                            scale["xMax"] = cybot[0]
+                        
+                        if(cybot[1]  < scale["yMin"]):
+                            scale["yMin"] = cybot[1]
+                        elif (cybot[1] > scale["yMax"]):
+                            scale["yMax"] = cybot[1]
                     
                     updateField(elements["Field_Surface"], fieldScans, cybot, scale, otherObjects)
 

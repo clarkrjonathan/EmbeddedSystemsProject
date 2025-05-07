@@ -102,7 +102,8 @@ def drawCybot(window, cybotSprite, color = (255, 0, 0)):
     if(len(cybotSprite) > 3):
         pygame.draw.circle(window, color, (cybotSprite[0], cybotSprite[1]), cybotSprite[3])
 
-        frontDotSize = cybotSprite[3]/5
+        #make size of mine which is 50mm
+        frontDotSize = cybotSprite[3] * (50/185)
 
         xOffset = math.cos((cybotSprite[2]) * (math.pi/180)) * (cybotSprite[3] - frontDotSize)
         yOffset = math.sin((cybotSprite[2]) * (math.pi/180)) * (cybotSprite[3] - frontDotSize)
