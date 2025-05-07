@@ -12,6 +12,7 @@ import datetime
 import os
 import cmath
 
+rockRadius = 75
 
 def check_socket_data(sock):
     sock.setblocking(0)
@@ -208,20 +209,20 @@ def drawCybot(window, cybotSprite, color = (255, 0, 0)):
         print("Cannot Draw cybot")
 
 #redraws field surface when the data changes which is anytime we receive a new cybot position or fieldData
-def updateField(surface, fieldScans, cybot, scale, cybotRadius = 185, pointRadius = 20):
+def updateField(surface, fieldScans, cybot, scale, bumpObjects, cybotRadius = 185, pointRadius = 20):
     windowWidth = surface.get_width()
     windowHeight = surface.get_height()
 
-    alphaMult = 25
+    alphaMult = 50
     
     surface.fill((0,0,0,0))
     for i in range(len(fieldScans)):
         scan = fieldScans[i]
         normalizedScan = normalizeObjects(scan, surface, scale)
         alphaVal = (255 - ((len(fieldScans) - i) * alphaMult))
-        alphaVal = 255 if alphaVal < 0 else alphaVal
+        alphaVal = 30 if alphaVal < 30 else alphaVal
 
-        drawObjects(normalizedScan, surface, (gold[0], gold[1], gold[2],  ))
+        drawObjects(normalizedScan, surface, (255, 255, 255, alphaVal))
 
     scaledcybot = [x for x in cybot]
     scaledcybot.append(cybotRadius)
@@ -251,7 +252,45 @@ def updateField(surface, fieldScans, cybot, scale, cybotRadius = 185, pointRadiu
 
         scaledcybot[0] += (windowWidth/2) - ((xSpan/yScale)/2)
 
+    for rock in bumpObjects:
+        scaledRock = rock.copy()
+        scaledRock[0] -= scale["xMin"]
+        scaledRock[1] -= scale["yMin"]
+
+        scaledRock.append(rockRadius)
+
+        if((xScale > yScale) and (xScale != 0)):
+            scaledRock[0] /= xScale
+            scaledRock[1] /= xScale
+            scaledRock[2] /= xScale
+
+            scaledRock[1] += (windowHeight/2) - ((ySpan/xScale)/2)
+
+        elif ((yScale != 0)):
+            scaledRock[0] /= yScale
+            scaledRock[1] /= yScale
+            scaledRock[2] /= yScale
+
+            scaledRock[0] += (windowWidth/2) - ((xSpan/yScale)/2)
+
+        pygame.draw.circle(surface, darkRed, (scaledRock[0], scaledRock[1]), scaledRock[2])
+
     drawCybot(surface, scaledcybot)
+
+def trackBumpObject(bumpObjects, cybotSprite, scale):
+    xOffset = math.cos((cybotSprite[2]) * (math.pi/180)) * (185 + rockRadius) 
+    yOffset = math.sin((cybotSprite[2]) * (math.pi/180)) * (185 + rockRadius)
+
+    x = cybotSprite[0] + xOffset
+    y = cybotSprite[1] + yOffset
+
+    scale["xMax"] = scale["xMax"] if x < scale["xMax"] else x
+    scale["xMin"] = x if x < scale["xMin"] else scale["xMin"]
+
+    scale["yMax"] = y if y > scale["yMax"] else scale["yMax"]
+    scale["yMin"] = y if y < scale["yMin"] else scale["yMin"]
+
+    bumpObjects.append([x, y])
 
 #inverts on y axis
 def invertObjects(objs):
@@ -288,10 +327,18 @@ def constructScreen(width, elements, state):
     trimButtonWidth = width/10
     trimButtonHeight = width/20
     trimButtonX = width/15
-    trimButtonY = height/2 + trimButtonHeight
+    trimButtonY = height/2 - trimButtonHeight
 
     elements["Trim_Plus"] = Rect((trimButtonX, trimButtonY), (trimButtonWidth, trimButtonHeight))
     elements["Trim_Minus"] = Rect((trimButtonX, trimButtonY + (4 * trimButtonHeight)/3), (trimButtonWidth, trimButtonHeight))
+
+    placeRockWidth = width/15
+    placeRockHeight = width/20
+
+    placeRockX = width - width/15 - placeRockWidth
+    placeRockY = height/2 - placeRockHeight
+
+    elements["Place_Rock"] = Rect((placeRockX, placeRockY), (placeRockWidth, placeRockHeight))
 
 def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 100):
     screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
@@ -364,12 +411,15 @@ def drawScreen(elements, state):
     
     pygame.draw.rect(elements["Screen"], warmGray, elements["Trim_Plus"])
     pygame.draw.rect(elements["Screen"], warmGray, elements["Trim_Minus"])
+    pygame.draw.rect(elements["Screen"], warmGray, elements["Place_Rock"])
 
-    writeOnRect(elements["Screen"], elements["Trim_Plus"], "Right Trim", darkRed)
-    writeOnRect(elements["Screen"], elements["Trim_Minus"], "Left Trim", darkRed)
+    writeOnRect(elements["Screen"], elements["Trim_Plus"], "Right Trim", black)
+    writeOnRect(elements["Screen"], elements["Trim_Minus"], "Left Trim", black)
 
     writeOnRect(elements["Screen"], elements["Scan_Tab"], "Scan", darkRed)
     writeOnRect(elements["Screen"], elements["Field_Tab"], "Field", darkRed)
+    
+    writeOnRect(elements["Screen"], elements["Place_Rock"], "Rock", black)
 
 
 
@@ -407,6 +457,9 @@ def main():
     #list of multiple scans, every time there is a new object list it will be appended
     #this always will be the raw data straight from cybot meaning the absolute positions in the room of points
     fieldScans = []
+
+    #13 cm
+    bumpObjects = []
 
     #values needed to scale any object to fit within other boundaries
     scale = {"xMin" : 0, "xMax" : 500, "yMin" : 0, "yMax" : 500}
@@ -483,6 +536,8 @@ def main():
                 elif(elements["Trim_Minus"].collidepoint(mouse[0], mouse[1])):
                     trim = "L"
                     client.send(trim.encode())
+                elif(elements["Place_Rock"].collidepoint(mouse[0], mouse[1])):
+                    trackBumpObject(bumpObjects, cybot, scale)
                     
             
             elif event.type == pygame.KEYDOWN:
@@ -559,7 +614,7 @@ def main():
                     elif (cybot[1] > scale["yMax"]):
                         scale["yMax"] = cybot[1]
                     
-                    updateField(elements["Field_Surface"], fieldScans, cybot, scale)
+                    updateField(elements["Field_Surface"], fieldScans, cybot, scale, bumpObjects)
 
                     
                 
