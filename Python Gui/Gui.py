@@ -11,8 +11,9 @@ from ISUColors import *
 import datetime
 import os
 import cmath
+from screen import *
+from field import *
 
-rockRadius = 75
 
 def check_socket_data(sock):
     sock.setblocking(0)
@@ -36,83 +37,13 @@ def recvString(client):
     
     return message 
 
-#if its the initial scan it will just initialize to the objects
-def updateScale(objs, scale, initialScale = True):
-    xMin = min([x[1] for x in objs])
-    yMin = min([x[2] for x in objs])
 
-    xMax = max([x[1] for x in objs])
-    yMax = max([x[2] for x in objs])
-
-    scale["xMin"]  = xMin if (xMin < scale["xMin"]) or initialScale else scale["xMin"]
-    scale["xMax"] = xMax if (xMax > scale["xMax"]) or initialScale else scale["xMax"]
-
-    scale["yMin"] =  yMin if (yMin < scale["yMin"]) or initialScale else scale["yMin"]
-    scale["yMax"] = yMax if (yMax > scale["yMax"]) or initialScale else scale["yMax"]
-    
 
 #may need to add some sort of stop message if I can't send the whole field in one but I should be able to
 def parseObjects(message):
     objStrings = message.splitlines()[1:]
     objs = [[float(k) for k in x.split(", ")] for x in objStrings]
     return objs
-
-#normalizes objects to be within a certain span at a specified offset
-def normalizeObjects(objs, windowSurface, scale):
-    windowWidth = windowSurface.get_width()
-    windowHeight = windowSurface.get_height()
-
-    #measure y span
-    #measure x span
-
-    #scale objects size by this too
-    if(objs == -1):
-        return -1
-    
-    #copy array
-    normalized = [[k for k in x] for x in objs]
-
-
-    xMin = scale["xMin"]
-    yMin = scale["yMin"]
-
-    xSpan = scale["xMax"] - scale["xMin"]
-    xScale = xSpan/windowWidth
-    
-    ySpan = scale["yMax"] - scale["yMin"]
-    yScale = ySpan/windowHeight
-
-
-    if(xScale > yScale):
-        for obj in normalized:
-
-            obj[1] -= xMin
-
-            obj[2] -= yMin
-
-            obj[0] /= xScale    
-            obj[1]  /= xScale
-            obj[2] /= xScale
-
-            obj[2] += (windowHeight/2) - ((ySpan/xScale)/2)
-
-
-    else:
-        for obj in normalized:
-            obj[1] -= xMin
-
-            obj[2] -= yMin
-            
-            obj[0] /= yScale
-            obj[1] /= yScale
-            obj[2] /= yScale
-
-            obj[1] += (windowWidth/2) - ((xSpan/yScale)/2)
-
-
-
-    return normalized
-
 
 #draws objects onto a window surface that will be rescaled
 def drawObjects(objs, window, color = gold):
@@ -121,163 +52,13 @@ def drawObjects(objs, window, color = gold):
         return
 
     for x in objs[1:]:
-        pygame.draw.circle(window, color, (x[1], x[2]), x[0])
+        pygame.draw.circle(window, color, (x[0], x[1]), x[2])
 
-
-
-
-#returns state if changed, -1 otherwise
-def keyDownEventHandler(event, movementStack, currState):
-    if(event.key == pygame.K_SPACE):
-        movementStack.clear()
-        if(currState != "_"):
-            return "_"
-        else:
-            return -1
-
-    if(event.key == pygame.K_w and not("W" in movementStack)):
-        movementStack.append("W")
-
-    elif(event.key == pygame.K_s and not("S" in movementStack)):
-        movementStack.append("S")
-    
-    elif(event.key == pygame.K_d and not("D" in movementStack)):
-        movementStack.append("D")
-
-    elif(event.key == pygame.K_a and not("A" in movementStack)):
-        movementStack.append("A")
-    
-
-
-    if(len(movementStack) > 0):
-
-        if(currState != movementStack[-1]):
-            return movementStack[-1]
-    
-
-    #the only way to return here is if another key is pressed that doesn't do anything
-    return -1
-
-#returns state if changed, -1 otherwise
-def keyUpEventHandler(event, movementStack, currState):
-    if(len(movementStack) == 0):
-        return -1
-    
-    try:
-        if(event.key == pygame.K_w):
-            movementStack.remove("W")
-
-        elif(event.key == pygame.K_s):
-            movementStack.remove("S")
-    
-        elif(event.key == pygame.K_d):
-            movementStack.remove("D")
-
-        elif(event.key == pygame.K_a):
-            movementStack.remove("A")
-    except:
-        pass
-    
-
-    if(len(movementStack) > 0):
-
-        if(currState != movementStack[-1]):
-            #picked up end key
-            return movementStack[-1]
-        
-    #state should be idle
-    elif(currState != "I"):
-        #picked up last key
-        return "I"
-
-    return -1
-
-#draw cybot
-#cybotSprite is a list of x, y, angle, radius
-def drawCybot(window, cybotSprite, color = (255, 0, 0)):
-    #we have angle to draw
-    if(len(cybotSprite) > 3):
-        pygame.draw.circle(window, color, (cybotSprite[0], cybotSprite[1]), cybotSprite[3])
-
-        frontDotSize = cybotSprite[3]/5
-
-        xOffset = math.cos((cybotSprite[2]) * (math.pi/180)) * (cybotSprite[3] - frontDotSize)
-        yOffset = math.sin((cybotSprite[2]) * (math.pi/180)) * (cybotSprite[3] - frontDotSize)
-
-        pygame.draw.circle(window, (0,0,0), (cybotSprite[0] + xOffset, cybotSprite[1] + yOffset), frontDotSize)
-    else:
-        print("Cannot Draw cybot")
-
-#redraws field surface when the data changes which is anytime we receive a new cybot position or fieldData
-def updateField(surface, fieldScans, cybot, scale, bumpObjects, cybotRadius = 185, pointRadius = 20):
-    windowWidth = surface.get_width()
-    windowHeight = surface.get_height()
-
-    alphaMult = 50
-    
-    surface.fill((0,0,0,0))
-    for i in range(len(fieldScans)):
-        scan = fieldScans[i]
-        normalizedScan = normalizeObjects(scan, surface, scale)
-        alphaVal = (255 - ((len(fieldScans) - i) * alphaMult))
-        alphaVal = 30 if alphaVal < 30 else alphaVal
-
-        drawObjects(normalizedScan, surface, (255, 255, 255, alphaVal))
-
-    scaledcybot = [x for x in cybot]
-    scaledcybot.append(cybotRadius)
-
-    scaledcybot[0] -= scale["xMin"]
-    scaledcybot[1] -= scale["yMin"]
-
-    xSpan = scale["xMax"] - scale["xMin"]
-    xScale = (xSpan)/windowWidth
-    
-    ySpan = scale["yMax"] - scale["yMin"]
-    yScale = (ySpan)/windowHeight
-
-
-
-    if((xScale > yScale) and (xScale != 0)):
-        scaledcybot[0] /= xScale
-        scaledcybot[1] /= xScale
-        scaledcybot[3] /= xScale
-
-        scaledcybot[1] += (windowHeight/2) - ((ySpan/xScale)/2)
-
-    elif ((yScale != 0)):
-        scaledcybot[0] /= yScale
-        scaledcybot[1] /= yScale
-        scaledcybot[3] /= yScale
-
-        scaledcybot[0] += (windowWidth/2) - ((xSpan/yScale)/2)
-
-    for rock in bumpObjects:
-        scaledRock = rock.copy()
-        scaledRock[0] -= scale["xMin"]
-        scaledRock[1] -= scale["yMin"]
-
-        scaledRock.append(rockRadius)
-
-        if((xScale > yScale) and (xScale != 0)):
-            scaledRock[0] /= xScale
-            scaledRock[1] /= xScale
-            scaledRock[2] /= xScale
-
-            scaledRock[1] += (windowHeight/2) - ((ySpan/xScale)/2)
-
-        elif ((yScale != 0)):
-            scaledRock[0] /= yScale
-            scaledRock[1] /= yScale
-            scaledRock[2] /= yScale
-
-            scaledRock[0] += (windowWidth/2) - ((xSpan/yScale)/2)
-
-        pygame.draw.circle(surface, darkRed, (scaledRock[0], scaledRock[1]), scaledRock[2])
-
-    drawCybot(surface, scaledcybot)
 
 def trackBumpObject(bumpObjects, cybotSprite, scale):
+    rockRadius = 75
+    rockColor = (155, 155, 155)
+
     xOffset = math.cos((cybotSprite[2]) * (math.pi/180)) * (185 + rockRadius) 
     yOffset = math.sin((cybotSprite[2]) * (math.pi/180)) * (185 + rockRadius)
 
@@ -290,58 +71,7 @@ def trackBumpObject(bumpObjects, cybotSprite, scale):
     scale["yMax"] = y if y > scale["yMax"] else scale["yMax"]
     scale["yMin"] = y if y < scale["yMin"] else scale["yMin"]
 
-    bumpObjects.append([x, y])
-
-#inverts on y axis
-def invertObjects(objs):
-    if(objs == -1):
-        return
-
-    objs[0][3] += 180
-    for x in objs:
-        x[2] = x[2] * -1
-
-
-#This is where all sizes of elements will be configured, except for things within the window which are a seperate surface and just scale to the window box
-#also called every time the display is resized
-def constructScreen(width, elements, state):
-    height = (width * 9)/16
-
-    windowWidth = width * (3/5)
-    windowHeight = height * (3/5)
-
-    windowXOffset = (width - windowWidth)/2
-    windowYOffset = ((height - windowHeight)/2) - height/10
-
-    fieldTabHeight = width/40
-    fieldTabWidth = width/20
-    fieldTabX = windowWidth/30
-
-    elements["Field_Tab"] = Rect((windowXOffset + fieldTabX, windowYOffset - fieldTabHeight + 3) , (fieldTabWidth, fieldTabHeight))
-    elements["Scan_Tab"] = Rect((windowXOffset + fieldTabX + fieldTabWidth, windowYOffset - fieldTabHeight + 3) , (fieldTabWidth, fieldTabHeight))
-
-    elements["Screen"] = pygame.display.set_mode((width, height), pygame.RESIZABLE)
-    elements["Window_Rect"] = Rect((windowXOffset, windowYOffset) , (windowWidth, windowHeight))
-
-    
-    trimButtonWidth = width/10
-    trimButtonHeight = width/20
-    trimButtonX = width/15
-    trimButtonY = height/2 - trimButtonHeight
-
-    elements["Trim_Plus"] = Rect((trimButtonX, trimButtonY), (trimButtonWidth, trimButtonHeight))
-    elements["Trim_Minus"] = Rect((trimButtonX, trimButtonY + (4 * trimButtonHeight)/3), (trimButtonWidth, trimButtonHeight))
-
-    placeRockWidth = width/15
-    placeRockHeight = width/20
-
-    placeRockX = width - width/15 - placeRockWidth
-    placeRockY = height/2 - placeRockHeight
-
-    elements["Place_Rock"] = Rect((placeRockX, placeRockY), (placeRockWidth, placeRockHeight))
-
-def writeOnRect(screen, rect, text, color, font="Helvetica", fontSize = 100):
-    screen.blit(pygame.transform.scale(pygame.font.SysFont(font, fontSize).render(text, True, color), (rect.width, rect.height)), (rect.x, rect.y))
+    bumpObjects.append([x, y, rockRadius, rockColor])
 
 
 def getIRDist(rawIR):
@@ -358,6 +88,9 @@ def getIRDist(rawIR):
     dist = math.pow(x, y)
 
     return dist
+
+def checkDistSquared(pointA, pointB):
+    return ((pointA[0] - pointB[0])**2) * ((pointA[1]-pointB[1])**2)
 
 #scan data comes in as irRaw, irDist, pingDist, angle
 def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing = True, normalizeRawIR = True, xMin=0, xMax=180, yMin = 0, yMax = 200):
@@ -389,52 +122,6 @@ def graphScan(window, scanData, graphIRRaw = True, graphIRDist = True, graphPing
         if(graphPing):
             pygame.draw.circle(window, pingDistColor, (point[3], window.get_height() - point[2]), pointSize)
 
-#actually draws elements on the screen
-def drawScreen(elements, state):
-    #keep in mind state determines which elements are displayed, constructing them basically just resizes
-    pygame.font.init()
-
-    font = "Helvetica"
-
-    windowColor = (0,0,0)
-    #draw elements
-    #based on state 
-    elements["Screen"].fill(darkRed)
-    
-
-    
-    fieldTabColor = windowColor if state["Window_Tab"] == "Field" else warmGray
-    scanTabColor = windowColor if state["Window_Tab"] == "Scan" else warmGray
-    
-    pygame.draw.rect(elements["Screen"], scanTabColor, elements["Scan_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
-    pygame.draw.rect(elements["Screen"], fieldTabColor, elements["Field_Tab"], border_top_left_radius=int(elements["Field_Tab"].x/30),border_top_right_radius=int(elements["Field_Tab"].x/30))
-    
-    pygame.draw.rect(elements["Screen"], warmGray, elements["Trim_Plus"])
-    pygame.draw.rect(elements["Screen"], warmGray, elements["Trim_Minus"])
-    pygame.draw.rect(elements["Screen"], warmGray, elements["Place_Rock"])
-
-    writeOnRect(elements["Screen"], elements["Trim_Plus"], "Right Trim", black)
-    writeOnRect(elements["Screen"], elements["Trim_Minus"], "Left Trim", black)
-
-    writeOnRect(elements["Screen"], elements["Scan_Tab"], "Scan", darkRed)
-    writeOnRect(elements["Screen"], elements["Field_Tab"], "Field", darkRed)
-    
-    writeOnRect(elements["Screen"], elements["Place_Rock"], "Rock", black)
-
-
-
-    pygame.draw.rect(elements["Screen"], windowColor, elements["Window_Rect"], border_radius=int(elements["Window_Rect"].x/20))
-
-    if(state["Window_Tab"] == "Field"):
-        elements["Screen"].blit(pygame.transform.scale(elements["Field_Surface"], (elements["Window_Rect"].width, elements["Window_Rect"].height)), (elements["Window_Rect"].x,elements["Window_Rect"].y))
-        fieldTabColor = windowColor
-    elif(state["Window_Tab"] == "Scan"):
-        elements["Screen"].blit(pygame.transform.scale(elements["Scan_Surface"], (elements["Window_Rect"].width, elements["Window_Rect"].height)), (elements["Window_Rect"].x,elements["Window_Rect"].y))
-        scanTabColor = windowColor
-
-    pygame.display.update()
-
-
 #objects x, y, size(radius for circle, edge for square, either way can be linearly scaled), type stored in currField
 
 def main():
@@ -458,8 +145,7 @@ def main():
     #this always will be the raw data straight from cybot meaning the absolute positions in the room of points
     fieldScans = []
 
-    #13 cm
-    bumpObjects = []
+    otherObjects = []
 
     #values needed to scale any object to fit within other boundaries
     scale = {"xMin" : 0, "xMax" : 500, "yMin" : 0, "yMax" : 500}
@@ -524,6 +210,7 @@ def main():
 
             if event.type == pygame.MOUSEBUTTONDOWN:
 
+
                 if(elements["Field_Tab"].collidepoint(mouse[0], mouse[1])):
 
                     state["Window_Tab"] = "Field"
@@ -537,7 +224,7 @@ def main():
                     trim = "L"
                     client.send(trim.encode())
                 elif(elements["Place_Rock"].collidepoint(mouse[0], mouse[1])):
-                    trackBumpObject(bumpObjects, cybot, scale)
+                    trackBumpObject(otherObjects, cybot, scale)
                     
             
             elif event.type == pygame.KEYDOWN:
@@ -550,7 +237,7 @@ def main():
             #change in state
             if (newState != -1):
                 currState = newState
-                #print(currState)
+
                 client.send(currState.encode())    
             
 
@@ -579,7 +266,7 @@ def main():
                     rawObjects = parseObjects(message)
                     if(state["FirstScan"]):
                         state["FirstScan"]= False
-
+                    
                     fieldScans.append(rawObjects)
 
                     #don't bother updating the field here because the field will be updated when we receive the cybot position and will just be overwritten
@@ -614,7 +301,7 @@ def main():
                     elif (cybot[1] > scale["yMax"]):
                         scale["yMax"] = cybot[1]
                     
-                    updateField(elements["Field_Surface"], fieldScans, cybot, scale, bumpObjects)
+                    updateField(elements["Field_Surface"], fieldScans, cybot, scale, otherObjects)
 
                     
                 
@@ -646,5 +333,5 @@ def main():
     pygame.quit()
     
 
-
-main()
+if __name__ == "__main__":
+    main()

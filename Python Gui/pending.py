@@ -7,6 +7,7 @@ import math
 import threading
 import queue
 from ISUColors import *
+import os
 
 
 def connectSocket(cybot_ip, cybot_port, q):
@@ -179,9 +180,13 @@ def drawPendingScreen(elements, state, defaultIPText, defaultPortText):
 #return to this screen with a notification the connection stopped
 def pendingConnection():
 
-    with open("SocketInfo.txt", "r") as file:
-        defaultIPText = file.readline().strip()
-        defaultPortText = file.readline().strip()
+    if(os.path.isdir("SocketInfo.txt")):
+        with open("SocketInfo.txt", "r") as file:
+            defaultIPText = file.readline().strip()
+            defaultPortText = file.readline().strip()
+    else:
+        defaultIPText = "192.168.1.1"
+        defaultPortText = "288"
 
 
     width = 800
