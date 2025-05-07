@@ -13,6 +13,7 @@
 #include "driverlib/interrupt.h"
 #include "open_interface.h"
 #include "math.h"
+#include "servo.h"
 // #include "button.h"
 
 typedef struct
@@ -62,7 +63,7 @@ void move(int leftWheel, int rightWheel);
 extern volatile char command_byte;
 extern volatile int command_flag;
 
-float trim = 0.981;
+float trim = 0.9809;
 
 int main(void)
 {
@@ -75,10 +76,13 @@ int main(void)
     oi_update(cybot);
     cyBOT_init_Scan();
 
+    servo_moveNonBlocking(0);
+
     int cliffStatus = 0;
 
     int firstCliffTrigger = 1;
-    int firstBumpTrigger = 1;
+    int firstBumpTriggerRight = 1;
+    int firstBumpTriggerLeft = 1;
 
     int currAngle = 0;
     int scanning = 0;
@@ -141,7 +145,34 @@ int main(void)
             if(firstCliffTrigger) {
                 command_byte = 'I';
                 send_string_gui("I");
-                send_string_gui("Found hole");
+
+                if(cliff_left) {
+                    send_string_gui("Hole Left");
+                } else if (cliff_right) {
+                    send_string_gui("Hole Right");
+                } else if (cliff_front) {
+                    send_string_gui("Hole Front");
+                }
+
+                firstCliffTrigger = 0;
+            }
+
+
+        } else if (((cliffStatus == (boundry_left)) || (cliffStatus == (boundry_right)))
+                || (cliffStatus == (boundry_front))) {
+            //boundry found
+            if(firstCliffTrigger) {
+                command_byte = 'I';
+                send_string_gui("I");
+
+                if(cliffStatus == boundry_left) {
+                    send_string_gui("Boundary Left");
+                } else if (cliffStatus == boundry_right) {
+                    send_string_gui("Boundary Right");
+                } else if (cliffStatus == boundry_front) {
+                    send_string_gui("Boundary Front");
+                }
+
                 firstCliffTrigger = 0;
             }
 
@@ -151,27 +182,29 @@ int main(void)
         }
 
         //bump sensor handling
-        if(cybot->bumpLeft || cybot->bumpRight) {
+        if(cybot->bumpLeft && firstBumpTriggerLeft == 1) {
+            command_byte = 'I';
+            send_string_gui("I");
+            send_string_gui("Bumped Left");
 
-            if(firstBumpTrigger) {
-                command_byte = 'I';
-                send_string_gui("I");
-                if((cybot->bumpLeft) && (cybot->bumpRight)){
-                    send_string_gui("Bumped center");
-                }
-                if(cybot->bumpLeft) {
-                    send_string_gui("Bumped left");
-                }
+            firstBumpTriggerLeft = 0;
 
-                if(cybot->bumpRight) {
-                    send_string_gui("Bumped right");
-                }
-
-                firstBumpTrigger = 0;
-            }
-        } else {
-            firstBumpTrigger = 1;
+        } else if (!(cybot->bumpLeft)) {
+            firstBumpTriggerLeft = 1;
         }
+
+        //bump sensor handling
+        if(cybot->bumpRight && firstBumpTriggerRight == 1) {
+            command_byte = 'I';
+            send_string_gui("I");
+            send_string_gui("Bumped Right");
+
+            firstBumpTriggerRight = 0;
+
+        } else if (!(cybot->bumpRight)){
+            firstBumpTriggerRight = 1;
+        }
+
 
         //don't do time consuming operations within each loop, we need to be free to recieve next data
 
@@ -244,6 +277,7 @@ int main(void)
                 sendIRPoints(scan_data, 180, cybotPos, cybotAngle);
                 scanning = 0;
                 command_byte = 'I';
+                servo_moveNonBlocking(0);
             } else {
                 cyBOT_Scan(currAngle, &scan_data[currAngle]);
                 if(currAngle % 10 == 0) {
@@ -437,16 +471,16 @@ int checkForCliffs(oi_t *cybot)
     {
         return cliff_right;
     }
-    else if ((raw_frontleft > 2150) || (raw_frontright > 2150))
+    else if ((raw_frontleft > 2400) || (raw_frontright > 2400))
         {
 
             return boundry_front;
         }
-    else if (raw_left > 2150)
+    else if (raw_left > 2400)
     {
         return boundry_left;
     }
-    else if (raw_right > 2150)
+    else if (raw_right > 2400)
     {
         return boundry_right;
     }

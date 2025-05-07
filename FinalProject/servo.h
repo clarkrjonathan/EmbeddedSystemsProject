@@ -21,6 +21,7 @@ void setPulseLength(uint32_t);
 void servo_calibrate(void);
 
 void servo_setPulseLength(uint32_t);
+void servo_moveNonBlocking(float degrees);
 
 #endif /* SERVO_H_ */
 

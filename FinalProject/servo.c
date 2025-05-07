@@ -13,8 +13,8 @@
 uint32_t calibratedLeft = 34650;
 uint32_t calibratedRight = 7760;
 float currAngle = 90;
-int timeMult = 15;
-int timeBias = 50;
+int timeMult = 1;
+int timeBias = 0;
 
 void servo_init(void)
 {
@@ -90,6 +90,28 @@ void servo_move(float degrees)
     float time = abs(currAngle - degrees) * timeMult + timeBias;
     timer_waitMillis(time);
     currAngle = degrees;
+}
+
+void servo_moveNonBlocking(float degrees) {
+    //generate pulse based on degree
+        //wait some delay based on this
+        //return
+
+        //find ratio of degrees
+        float ratio = 0;
+        if(degrees >= 180) {
+            ratio = 1;
+        } else if (degrees <= 0) {
+            ratio = 0;
+        } else {
+            ratio = (degrees)/180;
+        }
+
+        uint32_t correctedPulseLength =(ratio * (calibratedLeft - calibratedRight)) + calibratedRight;
+
+        servo_setPulseLength(correctedPulseLength);
+        float time = abs(currAngle - degrees) * timeMult + timeBias;
+        currAngle = degrees;
 }
 
 //sets match registers based on pulseLength in clock cycles
