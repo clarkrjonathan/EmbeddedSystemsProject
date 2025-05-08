@@ -10,8 +10,11 @@
 #include "Timer.h"
 #include "lcd.h"
 
-uint32_t calibratedLeft = 34650;
-uint32_t calibratedRight = 7760;
+//for 15: 36750
+//8530
+
+uint32_t calibratedLeft = 36750;
+uint32_t calibratedRight = 8530;
 float currAngle = 90;
 int timeMult = 1;
 int timeBias = 0;

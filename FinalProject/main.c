@@ -14,6 +14,7 @@
 #include "open_interface.h"
 #include "math.h"
 #include "servo.h"
+#include "Load_songs.h"
 // #include "button.h"
 
 typedef struct
@@ -63,7 +64,9 @@ void move(int leftWheel, int rightWheel);
 extern volatile char command_byte;
 extern volatile int command_flag;
 
-float trim = 0.9809;
+
+
+float trim = .835;
 
 int main(void)
 {
@@ -77,6 +80,8 @@ int main(void)
     cyBOT_init_Scan();
 
     servo_moveNonBlocking(0);
+
+    loadsongs();
 
     int cliffStatus = 0;
 
@@ -93,6 +98,7 @@ int main(void)
     cybotPos.y = 0;
     float cybotAngle = 0;
     int loopCount = 0;
+    int song = 1;
 
     cyBOT_Scan_t scan_data[200];
 
@@ -244,6 +250,19 @@ int main(void)
 
 
             break;
+        case 'F':
+            move(0,0);
+            command_byte = 'I';
+            send_string_gui("I");
+            send_string_gui("Song Played");
+            oi_play_song(song);
+
+            if(song < 3) {
+                song++;
+            } else {
+                song = 1;
+            }
+            break;
 
         case 'L':
             if(trim > .001) {
@@ -307,8 +326,8 @@ void send_string_putty(const char *message) {
 }
 
 float getIRDist(float rawIR) {
-    float a = 9561.29;
-    float exp = -0.54574;
+    float a = 10680.19957;
+    float exp = -.5841744;
 
     return pow(rawIR/a, 1/exp);
 }
@@ -354,11 +373,27 @@ void sendIRPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, floa
             point = getAbsolutePoint(point, cybotPos, cybotAngle);
 
             char message[50];
-            sprintf(message, "%.2f, %.2f, %.2f\n", 20.0, point.x, point.y);
+            sprintf(message, "%.2f, %.2f, %.2f\n", point.x, point.y, 20.0);
             send_string_putty(message);
         }
 
     }
+    //add central invisible point for scaling purposes
+    for (i = 0; i < 3; i++) {
+        vector point;
+        point.isPolar = 1;
+        point.x = 90 * i;
+        //assuming anything within 500 should be safe
+        point.y = 300;
+
+        point = getAbsolutePoint(point, cybotPos, cybotAngle);
+
+
+        sprintf(message, "%.2f, %.2f, %.2f\n", point.x, point.y, 0.0);
+        send_string_putty(message);
+    }
+
+
     //For some reason its throwing a system interrupt here I need to find where its doing that, whats strange is it lets me finish out the function before going to fault isr
 
     uart_sendChar(0b0);
@@ -471,16 +506,16 @@ int checkForCliffs(oi_t *cybot)
     {
         return cliff_right;
     }
-    else if ((raw_frontleft > 2400) || (raw_frontright > 2400))
+    else if ((raw_frontleft > 2600) || (raw_frontright > 2600))
         {
 
             return boundry_front;
         }
-    else if (raw_left > 2400)
+    else if (raw_left > 2600)
     {
         return boundry_left;
     }
-    else if (raw_right > 2400)
+    else if (raw_right > 2600)
     {
         return boundry_right;
     }
@@ -491,7 +526,7 @@ int checkForCliffs(oi_t *cybot)
 }
 
 void move(int rightWheel, int leftWheel) {
-    oi_setWheels(rightWheel * (1/trim), leftWheel * (trim));
+    oi_setWheels(rightWheel, leftWheel * (trim));
 }
 
 void send_string_gui(const char *message)
