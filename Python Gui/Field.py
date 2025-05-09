@@ -113,20 +113,30 @@ def drawCybot(window, cybotSprite, color = (255, 0, 0)):
         print("Cannot Draw cybot")
 
 #redraws field surface when the data changes which is anytime we receive a new cybot position or fieldData
-def updateField(surface, fieldScans, cybot, scale, otherObjects, cybotRadius = 185, pointRadius = 20):
+def updateField(surface, fieldScansIR, fieldScansPing, cybot, scale, otherObjects, cybotRadius = 185, pointRadius = 20):
     windowWidth = surface.get_width()
     windowHeight = surface.get_height()
 
-    alphaMult = 50
+    
     
     surface.fill((0,0,0,0))
-    for i in range(len(fieldScans)):
-        scan = fieldScans[i]
+
+    if(len(fieldScansPing) > 0):
+        normalizedScan = normalizeObjects(fieldScansPing[-1], surface, scale)
+        drawObjects(normalizedScan, surface, (0, 20, 255, 60))
+
+
+
+    alphaMult = 50
+    for i in range(len(fieldScansIR)):
+        scan = fieldScansIR[i]
         normalizedScan = normalizeObjects(scan, surface, scale)
-        alphaVal = (255 - ((len(fieldScans) - i) * alphaMult))
+        alphaVal = (255 - ((len(fieldScansIR) - i) * alphaMult))
         alphaVal = 30 if alphaVal < 30 else alphaVal
 
         drawObjects(normalizedScan, surface, (255, 255, 255, alphaVal))
+
+    
 
     scaledcybot = [x for x in cybot]
     scaledcybot.append(cybotRadius)
@@ -139,7 +149,6 @@ def updateField(surface, fieldScans, cybot, scale, otherObjects, cybotRadius = 1
     
     ySpan = scale["yMax"] - scale["yMin"]
     yScale = (ySpan)/windowHeight
-
 
 
     if((xScale > yScale) and (xScale != 0)):

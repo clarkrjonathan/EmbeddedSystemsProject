@@ -172,7 +172,9 @@ def main():
 
     #list of multiple scans, every time there is a new object list it will be appended
     #this always will be the raw data straight from cybot meaning the absolute positions in the room of points
-    fieldScans = []
+    fieldScansIR = []
+
+    fieldScansPing = []
 
     otherObjects = []
 
@@ -270,7 +272,7 @@ def main():
 
                     if(len(otherObjects)>0):
                         updateScale(otherObjects, scale, state["FirstScan"])
-                    for scan in fieldScans:
+                    for scan in fieldScansIR:
                         updateScale(scan, scale, state["FirstScan"])
 
             #change in state
@@ -299,20 +301,24 @@ def main():
             if(data == b'\x06'):
                 message = recvString(client)
             
-                if(message[0:6] == "Field:"):
+                if(message[0:10] == "IR Points:"):
                     #redraw the field
 
                     rawObjects = parseObjects(message)
                     if(state["FirstScan"]):
                         state["FirstScan"]= False
                     
-                    fieldScans.append(rawObjects)
+                    fieldScansIR.append(rawObjects)
 
                     #don't bother updating the field here because the field will be updated when we receive the cybot position and will just be overwritten
                     #all we need to do here is add points to fieldScan and update our scale which could end up just being overridden by the cybot
                     updateScale(rawObjects, scale, state["FirstScan"])
-
-                    objects = normalizeObjects(rawObjects, elements["Field_Surface"], scale)
+                
+                elif(message[0:12] == "Ping Points:"):
+                    
+                    rawObjects = parseObjects(message)
+                    
+                    fieldScansPing.append(rawObjects)
 
 
                 elif(message[0:5] == "Scan:"):
@@ -345,7 +351,7 @@ def main():
                         elif (cybot[1] > scale["yMax"]):
                             scale["yMax"] = cybot[1]
                     
-                    updateField(elements["Field_Surface"], fieldScans, cybot, scale, otherObjects)
+                    updateField(elements["Field_Surface"], fieldScansIR, fieldScansPing, cybot, scale, otherObjects)
 
                     
                 
