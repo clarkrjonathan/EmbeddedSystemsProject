@@ -59,6 +59,7 @@ void sendIRPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, floa
 vector getAbsolutePoint(vector point, vector cybotPos, float cybotAngle);
 vector toPolar(vector v);
 void move(int leftWheel, int rightWheel);
+void sendPingPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, float cybotAngle);
 
 
 extern volatile char command_byte;
@@ -217,6 +218,7 @@ int main(void)
         if(command_flag) {
 
             command_flag = 0;
+
         }
 
 
@@ -290,10 +292,12 @@ int main(void)
 
         if(scanning) {
             if(currAngle > 180) {
-
+                //completed scan
 
                 sendScan(scan_data, 180);
                 sendIRPoints(scan_data, 180, cybotPos, cybotAngle);
+                sendPingPoints(scan_data, 180, cybotPos, cybotAngle);
+
                 scanning = 0;
                 command_byte = 'I';
                 servo_moveNonBlocking(0);
@@ -310,7 +314,6 @@ int main(void)
 
         }
 
-
     }
 
 }
@@ -325,6 +328,9 @@ void send_string_putty(const char *message) {
 
 }
 
+//for 15
+//a = 10680.19957
+//exp = -.5841744
 float getIRDist(float rawIR) {
     float a = 10680.19957;
     float exp = -.5841744;
@@ -350,16 +356,43 @@ void sendScan(cyBOT_Scan_t scan_data[], int numPoints) {
 
 }
 
+void sendPingPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, float cybotAngle) {
+    float pingDist;
+    int i;
+    uart_sendChar(0b110);
+    send_string_putty("Ping Points:\n");
+
+    char message[50];
+
+    for(i = 0; i < numPoints; i++) {
+        pingDist = scan_data[i].sound_dist * 10;
+
+        if(pingDist < 2750) {
+            vector point;
+            point.isPolar = 1;
+            point.x = i;
+            point.y = pingDist;
+
+            point = getAbsolutePoint(point, cybotPos, cybotAngle);
+
+            sprintf(message, "%.2f, %.2f, %.2f\n", point.x, point.y, 20.0);
+            send_string_putty(message);
+
+        }
+    }
+
+    uart_sendChar(0b0);
+
+}
+
 //all units are millimeters
 void sendIRPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, float cybotAngle) {
     float irDist;
     int i;
     uart_sendChar(0b110);
-    send_string_putty("Field:\n");
+    send_string_putty("IR Points:\n");
 
     char message[50];
-    sprintf(message, "170, %.2f, %.2f, %.2f\n", cybotPos.x, cybotPos.y, cybotAngle);
-    send_string_putty(message);
 
     for(i = 0; i < numPoints; i++) {
         irDist = getIRDist(scan_data[i].IR_raw_val) * 10;
@@ -378,13 +411,15 @@ void sendIRPoints(cyBOT_Scan_t scan_data[], int numPoints, vector cybotPos, floa
         }
 
     }
+
+
     //add central invisible point for scaling purposes
     for (i = 0; i < 3; i++) {
         vector point;
         point.isPolar = 1;
         point.x = 90 * i;
         //assuming anything within 500 should be safe
-        point.y = 300;
+        point.y = 1000;
 
         point = getAbsolutePoint(point, cybotPos, cybotAngle);
 

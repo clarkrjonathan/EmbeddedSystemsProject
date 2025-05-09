@@ -13,8 +13,16 @@
 //for 15: 36750
 //8530
 
-uint32_t calibratedLeft = 36750;
-uint32_t calibratedRight = 8530;
+//for 00
+//left 35450
+//right 8390
+
+//for 04
+//left 34350
+//right 7900
+
+uint32_t calibratedLeft = 34350;
+uint32_t calibratedRight = 7900;
 float currAngle = 90;
 int timeMult = 1;
 int timeBias = 0;
